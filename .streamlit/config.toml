@@ -1,0 +1,22 @@
+# Streamlit theme for the Iris dashboard.
+#
+# Setting the theme here (rather than overriding widget internals with CSS)
+# keeps Streamlit's own widgets — radio, checkbox, toggle, focus rings — on the
+# project palette, so nothing falls back to the default red accent.
+# Colors match the tokens at the top of app.py.
+
+[theme]
+base = "light"
+
+primaryColor = "#12876A"            # Iris virginica teal — the app's accent
+backgroundColor = "#FAFAF5"         # paper
+secondaryBackgroundColor = "#FFFFFF"  # cards, inputs, dataframe surface
+textColor = "#16241E"               # primary ink
+
+font = "sans serif"
+
+[server]
+headless = true
+
+[browser]
+gatherUsageStats = false
