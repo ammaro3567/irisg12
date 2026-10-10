@@ -257,6 +257,9 @@ def style_figure(fig: go.Figure, height: int = 380, show_legend: bool = True) ->
             x=0,
             bgcolor="rgba(0,0,0,0)",
             font=dict(size=12, color=INK_2),
+            # Plotly reverses legend order for stacked traces; pin it so the
+            # legend always reads setosa, versicolor, virginica on every chart.
+            traceorder="normal",
         ),
         title=dict(font=dict(size=15, color=INK), x=0, xanchor="left", y=0.97),
         showlegend=show_legend,
@@ -315,6 +318,10 @@ HERO_IRIS = (
     "</g></svg>"
 )
 
+# Note for anyone editing this stylesheet: never write a less-than sign inside
+# it, comments included. The HTML parser ends a style element at the first
+# closing-tag sequence it sees, and a stray angle bracket can form one early --
+# silently discarding every rule after it, with no error shown anywhere.
 CSS = """
 <style>
 :root {
@@ -358,8 +365,8 @@ CSS = """
    would outrank the component classes below (the hero sits on a dark panel and
    needs its own light text). Any class-based rule now beats it. */
 :where(.stApp [data-testid="stMarkdownContainer"] p) { color: var(--ink-2); line-height: 1.65; }
-/* Button labels are also a <p> inside a markdown container. The rule above sets
-   an explicit colour on them, which beats the white the button inherits — so
+/* Button labels are paragraphs inside a markdown container. The rule above sets
+   an explicit colour on them, which beats the white the button inherits - so
    they are put back on `inherit` here. (:where() lowers specificity against
    competing rules, but an explicit value still wins over an inherited one.) */
 .stApp [data-testid="stButton"] [data-testid="stMarkdownContainer"] p,
@@ -645,6 +652,28 @@ CSS = """
 }
 </style>
 """
+
+
+def _assert_stylesheet_is_parseable() -> None:
+    """Fail loudly if an angle bracket crept into the stylesheet.
+
+    A less-than sign anywhere inside a style element -- a comment is enough --
+    can make the HTML parser close the element early. The browser then discards
+    every rule after that point and renders the app unstyled, without raising
+    anything on the server. Checking here turns that silent failure into a
+    visible one.
+    """
+    body = CSS.split("<style>", 1)[1].rsplit("</style>", 1)[0]
+    offenders = [
+        f"line {number}: {line.strip()}"
+        for number, line in enumerate(body.splitlines(), 1)
+        if "<" in line
+    ]
+    if offenders:
+        raise ValueError(
+            "The stylesheet contains an angle bracket, which truncates it in the "
+            "browser. Remove it (see the note above CSS):\n  " + "\n  ".join(offenders)
+        )
 
 
 def section(title: str, lede: str | None = None) -> None:
@@ -1277,6 +1306,8 @@ def render_result(prediction: dict[str, Any], model: Any, class_map: dict[Any, s
             hovertemplate="<b>Your flower</b><br>%{x}: %{y:.1f} cm<extra></extra>",
         )
     )
+    # One group per species, in the fixed order, so the species colours here
+    # match the result card above and the charts on the data page.
     for species_name in SPECIES_ORDER:
         comparison.add_trace(
             go.Bar(
@@ -1362,7 +1393,12 @@ def main() -> None:
         layout="wide",
         initial_sidebar_state="expanded",
     )
-    st.html(CSS)
+    # The stylesheet must go through st.markdown, not st.html: st.html runs its
+    # input through a sanitiser that strips <style> and inline <svg>. Passing it
+    # to st.html silently drops the entire design system, leaving the app on
+    # Streamlit's default look with no error anywhere.
+    _assert_stylesheet_is_parseable()
+    st.markdown(CSS, unsafe_allow_html=True)
 
     _, body, _ = st.columns([1, 22, 1])
     with body:
